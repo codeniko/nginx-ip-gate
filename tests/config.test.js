@@ -53,3 +53,24 @@ describe('config: sweep interval', () => {
             .toThrow(/Invalid SWEEP_INTERVAL/);
     });
 });
+
+describe('config: trust remote addr', () => {
+    test('defaults to false when unset', () => {
+        const cfg = loadConfig({ ...baseEnv, FIXED_TIMEOUT: '8h' });
+        expect(cfg.trustRemoteAddr).toBe(false);
+    });
+
+    test('"yes" → true (case-insensitive)', () => {
+        const cfg1 = loadConfig({ ...baseEnv, FIXED_TIMEOUT: '8h', TRUST_REMOTE_ADDR: 'yes' });
+        const cfg2 = loadConfig({ ...baseEnv, FIXED_TIMEOUT: '8h', TRUST_REMOTE_ADDR: 'YES' });
+        expect(cfg1.trustRemoteAddr).toBe(true);
+        expect(cfg2.trustRemoteAddr).toBe(true);
+    });
+
+    test('"no" / anything else → false', () => {
+        const cfgNo = loadConfig({ ...baseEnv, FIXED_TIMEOUT: '8h', TRUST_REMOTE_ADDR: 'no' });
+        const cfgWeird = loadConfig({ ...baseEnv, FIXED_TIMEOUT: '8h', TRUST_REMOTE_ADDR: 'true' });
+        expect(cfgNo.trustRemoteAddr).toBe(false);
+        expect(cfgWeird.trustRemoteAddr).toBe(false);
+    });
+});

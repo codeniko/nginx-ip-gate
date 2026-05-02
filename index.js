@@ -37,10 +37,15 @@ setInterval(() => {
 
 const gateTemplate = fs.readFileSync(new URL('./views/gate.html', import.meta.url), 'utf8');
 
-const gate = createGateHandler({ template: gateTemplate, allowlist, auth, logger });
-const verify = createVerifyHandler({ allowlist, logger });
-const deauth = createDeauthHandler({ allowlist, logger });
-const heartbeat = createHeartbeatHandler({ allowlist, auth, logger });
+const handlerDeps = { allowlist, logger, trustRemoteAddr: config.trustRemoteAddr };
+const gate = createGateHandler({ template: gateTemplate, auth, ...handlerDeps });
+const verify = createVerifyHandler(handlerDeps);
+const deauth = createDeauthHandler(handlerDeps);
+const heartbeat = createHeartbeatHandler({ auth, ...handlerDeps });
+
+if (config.trustRemoteAddr) {
+    console.log('[WARN] TRUST_REMOTE_ADDR=yes — DEV MODE. Falling back to req.socket.remoteAddress when X-Forwarded-For is missing. Disable in production.');
+}
 
 // Liveness probe for the Docker HEALTHCHECK. Intentionally silent (no
 // logger calls) and untouched by allowlist/auth so it can be hammered

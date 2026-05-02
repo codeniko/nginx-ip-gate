@@ -20,14 +20,14 @@ const decodeBasicAuth = (header) => {
     return { username: decoded.slice(0, colon), password: decoded.slice(colon + 1) };
 };
 
-export const createHeartbeatHandler = ({ allowlist, auth, logger }) => async (req, res) => {
+export const createHeartbeatHandler = ({ allowlist, auth, logger, trustRemoteAddr = false }) => async (req, res) => {
     if (req.method !== 'GET') {
         res.statusCode = 405;
         res.setHeader('Allow', 'GET');
         return res.end('METHOD NOT ALLOWED');
     }
 
-    const ip = req.headers['x-forwarded-for'];
+    const ip = req.headers['x-forwarded-for'] || (trustRemoteAddr ? req.socket?.remoteAddress : null);
     if (!ip) {
         logger.log('heartbeat: missing X-Forwarded-For');
         res.statusCode = 400;

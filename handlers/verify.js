@@ -1,11 +1,11 @@
-export const createVerifyHandler = ({ allowlist, logger }) => (req, res) => {
+export const createVerifyHandler = ({ allowlist, logger, trustRemoteAddr = false }) => (req, res) => {
     if (req.method !== 'GET') {
         res.statusCode = 405;
         res.setHeader('Allow', 'GET');
         return res.end('METHOD NOT ALLOWED');
     }
 
-    const ip = req.headers['x-forwarded-for'];
+    const ip = req.headers['x-forwarded-for'] || (trustRemoteAddr ? req.socket?.remoteAddress : null);
     if (!ip) {
         logger.log('verify: missing X-Forwarded-For');
         res.statusCode = 401;

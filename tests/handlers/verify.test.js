@@ -49,4 +49,25 @@ describe('verify handler', () => {
         handler({ method: 'GET', headers: { 'x-forwarded-for': '1.2.3.4' } }, res);
         expect(res.statusCode).toBe(200);
     });
+
+    test('with trustRemoteAddr=true and no XFF, falls back to socket.remoteAddress', () => {
+        const allowlist = { check: jest.fn(() => true) };
+        const handler = createVerifyHandler({ allowlist, logger: mockLogger(), trustRemoteAddr: true });
+        const res = mockRes();
+        handler({ method: 'GET', headers: {}, socket: { remoteAddress: '127.0.0.1' } }, res);
+        expect(allowlist.check).toHaveBeenCalledWith('127.0.0.1');
+        expect(res.statusCode).toBe(200);
+    });
+
+    test('with trustRemoteAddr=true and XFF present, XFF still wins', () => {
+        const allowlist = { check: jest.fn(() => true) };
+        const handler = createVerifyHandler({ allowlist, logger: mockLogger(), trustRemoteAddr: true });
+        const res = mockRes();
+        handler({
+            method: 'GET',
+            headers: { 'x-forwarded-for': '1.2.3.4' },
+            socket: { remoteAddress: '127.0.0.1' },
+        }, res);
+        expect(allowlist.check).toHaveBeenCalledWith('1.2.3.4');
+    });
 });

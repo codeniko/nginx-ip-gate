@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
+    "dev": "TRUST_REMOTE_ADDR=yes node index.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "smoke": "node bin/smoke.js",
     "hashpw": "node bin/hashpw.js"

@@ -20,10 +20,13 @@ npm run hashpw -- mySecret
 #     "alice": "$2a$10$..."
 #   }
 
-node index.js
+node index.js          # production
+npm run dev            # local browser testing (sets TRUST_REMOTE_ADDR=yes)
 ```
 
 `users.json` is gitignored. `.env` is committed with sensible defaults — edit it in place to change ports/timeouts. Comment a timeout out to disable just that one (at least one of `FIXED_TIMEOUT`/`SLIDING_TIMEOUT` must remain set).
+
+Use `npm run dev` when you want to fill in the form via `http://localhost:3000` without an Nginx in front; it sets `TRUST_REMOTE_ADDR=yes` for that one process so the handlers fall back to the connection's source IP. **Don't use it in production** — see the env vars table below.
 
 ## Endpoints
 
@@ -94,6 +97,7 @@ Rule of thumb when tuning: `rate` is for the attacker's average; `burst + nodela
 | `FIXED_TIMEOUT`   | (unset)         | Hard cap from login. `Nd|Nh|Nm|Ns`.  |
 | `SLIDING_TIMEOUT` | (unset)         | Inactivity timeout. Same format.     |
 | `SWEEP_INTERVAL`  | `24h`           | How often to evict expired entries from the in-memory map. Cleanup-only; doesn't affect when an IP loses access. |
+| `TRUST_REMOTE_ADDR` | `no`          | **Dev only.** When `yes`, falls back to `req.socket.remoteAddress` if `X-Forwarded-For` is missing. Lets you test the form via `http://localhost:3000` without an Nginx in front. Leave unset in production. |
 | `DEBUG`           | `no`            | `yes` to log every request           |
 
 At least one of `FIXED_TIMEOUT` and `SLIDING_TIMEOUT` must be set; setting both means an entry expires at whichever fires first. Recommended starting point: `FIXED_TIMEOUT=8h SLIDING_TIMEOUT=30m`.

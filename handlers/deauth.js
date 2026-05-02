@@ -4,14 +4,14 @@ const PAGE = `<!doctype html>
 </head><body><p>Signed out. This IP has been removed from the allowlist.</p></body></html>
 `;
 
-export const createDeauthHandler = ({ allowlist, logger }) => (req, res) => {
+export const createDeauthHandler = ({ allowlist, logger, trustRemoteAddr = false }) => (req, res) => {
     if (req.method !== 'GET') {
         res.statusCode = 405;
         res.setHeader('Allow', 'GET');
         return res.end('METHOD NOT ALLOWED');
     }
 
-    const ip = req.headers['x-forwarded-for'];
+    const ip = req.headers['x-forwarded-for'] || (trustRemoteAddr ? req.socket?.remoteAddress : null);
     if (!ip) {
         res.statusCode = 400;
         return res.end('MISSING X-FORWARDED-FOR');

@@ -18,7 +18,7 @@ const readBody = (req, limitBytes = 4096) => new Promise((resolve, reject) => {
     req.on('error', reject);
 });
 
-export const createGateHandler = ({ template, allowlist, auth, logger }) => {
+export const createGateHandler = ({ template, allowlist, auth, logger, trustRemoteAddr = false }) => {
     const render = (error = '') => template.replace('{{ERROR}}', escapeHtml(error));
 
     return async (req, res) => {
@@ -35,7 +35,7 @@ export const createGateHandler = ({ template, allowlist, auth, logger }) => {
             return res.end('METHOD NOT ALLOWED');
         }
 
-        const ip = req.headers['x-forwarded-for'];
+        const ip = req.headers['x-forwarded-for'] || (trustRemoteAddr ? req.socket?.remoteAddress : null);
         if (!ip) {
             logger.log('gate POST: missing X-Forwarded-For');
             res.statusCode = 400;
