@@ -1,0 +1,9 @@
+node_modules
+.git
+.gitignore
+.env
+users.json
+tests
+*.test.js
+README.md
+examples

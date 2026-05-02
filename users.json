@@ -1,0 +1,4 @@
+{
+  "alice": "REPLACE_WITH_OUTPUT_OF_npm_run_hashpw_yourpassword",
+  "bob": "REPLACE_WITH_OUTPUT_OF_npm_run_hashpw_yourpassword"
+}

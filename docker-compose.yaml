@@ -1,0 +1,19 @@
+services:
+  nginx-ip-gate:
+    container_name: nginx-ip-gate
+    build: .
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      USERS_FILE: /config/users.json
+      FIXED_TIMEOUT: 8h
+      SLIDING_TIMEOUT: 30m
+      SWEEP_INTERVAL: 24h
+      DEBUG: "no"
+    volumes:
+      - ./users.json:/config/users.json:ro
+    # Port 3000 is published to localhost only (not exposed on the LAN).
+    # Your Nginx on the host reaches the gate at http://127.0.0.1:3000.
+    ports:
+      - "127.0.0.1:3000:3000"

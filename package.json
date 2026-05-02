@@ -1,0 +1,21 @@
+{
+  "name": "nginx-ip-gate",
+  "version": "0.1.0",
+  "description": "Tiny Node.js auth backend for the Nginx auth_request module. Login form + bcrypt-hashed users; allowlists the requester's IP for a configurable window.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "smoke": "node bin/smoke.js",
+    "hashpw": "node bin/hashpw.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "=2.4.3",
+    "dotenv": "=17.2.2"
+  },
+  "devDependencies": {
+    "jest": "^30.0.2"
+  }
+}
