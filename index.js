@@ -83,6 +83,7 @@ const server = http.createServer((req, res) => {
 });
 
 const fmt = (ms) => ms == null ? 'off' : `${ms}ms`;
-console.log(`[${new Date().toISOString()}] nginx-ip-gate listening on ${config.host}:${config.port}`);
-console.log(`[${new Date().toISOString()}] users: ${Object.keys(users).length}, fixed=${fmt(config.fixedTimeout)} sliding=${fmt(config.slidingTimeout)}`);
-server.listen(config.port, config.host);
+server.listen(config.port, config.host, () => {
+    console.log(`[${new Date().toISOString()}] nginx-ip-gate listening on ${config.host}:${config.port}`);
+    console.log(`[${new Date().toISOString()}] users: ${Object.keys(users).length}, fixed=${fmt(config.fixedTimeout)} sliding=${fmt(config.slidingTimeout)}`);
+});
