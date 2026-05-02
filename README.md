@@ -32,8 +32,8 @@ Use `npm run dev` when you want to fill in the form via `http://localhost:3000` 
 
 | Method | Path         | Purpose                                                                                |
 | ------ | ------------ | -------------------------------------------------------------------------------------- |
-| GET    | `/gate`      | Login form                                                                             |
-| POST   | `/gate`      | Verify creds, allowlist `X-Forwarded-For`, redirect to `./`                            |
+| GET    | `/gate`      | Login form. Honours `?next=<safe-relative-url>` and embeds it as a hidden form field.  |
+| POST   | `/gate`      | Verify creds, allowlist `X-Forwarded-For`. With safe `next`: 302 there. Without: 200.  |
 | GET    | `/heartbeat` | Verify Basic-Auth creds, allowlist `X-Forwarded-For`. For routers/cron/automations.    |
 | GET    | `/verify`    | `auth_request` target — 200 if IP allowlisted, 401 otherwise                           |
 | GET    | `/deauth`    | Remove `X-Forwarded-For` from the allowlist (no auth required)                         |
@@ -52,6 +52,14 @@ curl -u alice:hunter2 https://example.com/heartbeat
 ```
 
 In a router's "Custom DDNS" UI: server URL `https://example.com/heartbeat`, username/password from `users.json`, update interval comfortably less than `SLIDING_TIMEOUT` (e.g. 5–10 min if sliding is 30m). The router never sees a redirect — responses are always small `text/plain` bodies. Make sure your router has hairpin NAT enabled (almost all do by default) so the request actually goes back through Nginx and gets the right `X-Forwarded-For`.
+
+### Returning users to the URL they were trying to reach
+
+When Nginx 401s an unauthenticated user, the example configs redirect to `/gate?next=$request_uri`. The gate parses `next` from its query string, validates it (must be a same-host relative path), embeds it as a hidden form field, and on successful login 302s back to it.
+
+**Open-redirect protection.** `next` is only honored if it starts with a single `/`, doesn't start with `//` (scheme-relative URLs are rejected — that's how `//evil.com` would slip through naive validators), contains no backslashes, and is ≤ 1024 chars. Anything else is silently collapsed to empty — same UX as if the user came directly to `/gate` with no `next` at all (form authenticates, doors open, no redirect).
+
+**One known limitation.** Nginx interpolates `$request_uri` raw into the redirect URL without URL-encoding. If the original URL contains `&`-separated query parameters (e.g. `/app1?a=1&b=2`), the gate's URL parser will only see `next=/app1?a=1` and lose `&b=2`. Single-`?` query strings roundtrip fine; multi-`&` ones don't. Most use cases (deep-linking to a path) are unaffected; if you need full query-string preservation, you'd URL-encode at the Nginx level (Lua module) or accept the limitation.
 
 ## Nginx config
 

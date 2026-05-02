@@ -3,25 +3,435 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign in</title>
+<title>Login — IP Gate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: system-ui, sans-serif; max-width: 22rem; margin: 4rem auto; padding: 0 1rem; }
-  h1 { font-size: 1.25rem; margin: 0 0 1rem; }
-  form { display: grid; gap: 0.75rem; }
-  input { font: inherit; padding: 0.6rem 0.75rem; border-radius: 0.4rem; border: 1px solid #888; }
-  button { font: inherit; padding: 0.6rem 0.75rem; border-radius: 0.4rem; border: 0; background: #4a7; color: #fff; cursor: pointer; }
-  button:hover { background: #3a6; }
-  .err { color: #c33; font-size: 0.9rem; min-height: 1.2em; }
+  :root {
+    --accent: #b8935a;
+    --bg: #050507;
+    --door-grad: linear-gradient(180deg, #1c1a1f 0%, #100f12 60%, #07060a 100%);
+    --card-bg: rgba(10, 10, 12, 0.85);
+    --fg: #e8e3d4;
+    --muted: rgba(232, 227, 212, 0.55);
+    --line: rgba(232, 227, 212, 0.18);
+    --field-bg: rgba(255, 255, 255, 0.025);
+    --error: #c2543d;
+    --radius: 12px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+  }
+
+  .stage { position: relative; width: 100%; height: 100vh; overflow: hidden; }
+
+  /* ---- inner sanctum (z 1) ---- */
+  .sanctum {
+    position: absolute; inset: 0; z-index: 1;
+    background:
+      radial-gradient(ellipse at 50% 50%, rgba(184, 147, 90, 0.15) 0%, transparent 55%),
+      var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  }
+  .halo {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: radial-gradient(circle, var(--accent) 0%, rgba(184, 147, 90, 0.5) 60%, transparent 100%);
+    animation: lg-gate-glow 2.4s ease-in-out infinite;
+  }
+  .welcome {
+    font-size: 11px; color: var(--muted);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+
+  /* ---- gate doors (z 2) ---- */
+  .door {
+    position: absolute; top: 0; width: 50%; height: 100%;
+    background: var(--door-grad); z-index: 2;
+    transition: transform 0.85s cubic-bezier(0.7, 0, 0.3, 1);
+  }
+  .door-l { left: 0; box-shadow: inset -1px 0 0 rgba(184, 147, 90, 0.2), 4px 0 24px rgba(0, 0, 0, 0.5); }
+  .door-r { right: 0; box-shadow: inset 1px 0 0 rgba(184, 147, 90, 0.2), -4px 0 24px rgba(0, 0, 0, 0.5); }
+  .door .ornaments { position: absolute; inset: 0; opacity: 0.22; pointer-events: none; }
+  .handle {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 8px; height: 80px; border-radius: 4px;
+    background: linear-gradient(180deg, var(--accent), rgba(184, 147, 90, 0.66));
+    box-shadow: 0 0 12px rgba(184, 147, 90, 0.4);
+  }
+  .door-l .handle { right: 18px; }
+  .door-r .handle { left: 18px; }
+
+  /* opened state — doors part, card fades */
+  .opened .door-l { transform: translateX(-100%); }
+  .opened .door-r { transform: translateX(100%); }
+  .opened .card {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+    pointer-events: none;
+  }
+
+  /* ---- form card (z 3) ---- */
+  .card {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 3;
+    width: min(360px, calc(100% - 48px));
+    background: var(--card-bg);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(184, 147, 90, 0.33);
+    border-radius: 16px;
+    box-shadow:
+      0 0 0 1px rgba(184, 147, 90, 0.13),
+      0 20px 60px rgba(0, 0, 0, 0.7),
+      0 0 80px rgba(184, 147, 90, 0.15);
+    padding: 26px 24px;
+    display: flex; flex-direction: column; gap: 18px;
+    transition: opacity 0.4s ease, transform 0.5s ease;
+  }
+
+  .header { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .crest { width: 36px; height: 36px; }
+  .crest.pulsing { animation: lg-key-pulse 1.2s ease-in-out infinite; }
+  .card h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .eyebrow {
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--muted); margin-top: -2px;
+  }
+
+  .fields { display: flex; flex-direction: column; gap: 12px; }
+  .field { display: flex; flex-direction: column; gap: 5px; position: relative; }
+  .field .label {
+    font-size: 11px; color: var(--muted);
+    font-weight: 500; letter-spacing: 0.05em;
+  }
+  .field input {
+    width: 100%; box-sizing: border-box;
+    padding: 12px 14px; font: inherit; font-size: 14px;
+    color: var(--fg); background: var(--field-bg);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(184, 147, 90, 0.15);
+  }
+  .field.errored input { border-color: var(--error); }
+  .field.errored input:focus { box-shadow: 0 0 0 3px rgba(194, 84, 61, 0.18); }
+
+  .pw-wrap { position: relative; }
+  .pw-wrap input { padding-right: 40px; }
+  .pw-toggle {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: transparent; border: 0; padding: 4px;
+    color: var(--muted); cursor: pointer;
+    display: flex; align-items: center;
+  }
+  .pw-toggle:hover { color: var(--fg); }
+  .pw-toggle .slash { display: none; }
+  .pw-toggle.shown .slash { display: inline; }
+
+  .field-err {
+    font-size: 11px; color: var(--error);
+    animation: lg-fadein 0.25s ease-out;
+  }
+  .field-err:empty { display: none; }
+
+  .form-err {
+    font-size: 11px; color: var(--error);
+    background: rgba(194, 84, 61, 0.12);
+    border: 1px solid rgba(194, 84, 61, 0.33);
+    padding: 8px 12px; border-radius: var(--radius);
+    text-align: center;
+    animation: lg-fadein 0.25s ease-out;
+  }
+  .form-err:empty { display: none; }
+
+  .submit {
+    height: 44px; border: 0; border-radius: var(--radius);
+    background: linear-gradient(180deg, var(--accent), rgba(184, 147, 90, 0.8));
+    color: #0a0a0c;
+    font: inherit; font-size: 12px; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    cursor: pointer;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.25) inset,
+      0 4px 14px rgba(184, 147, 90, 0.33);
+    transition: transform 0.1s, opacity 0.15s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .submit:active { transform: scale(0.99); }
+  .submit[disabled] { cursor: wait; opacity: 0.85; }
+
+  .spinner {
+    display: none;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(0, 0, 0, 0.3);
+    border-top-color: #0a0a0c;
+    border-radius: 50%;
+    animation: lg-spin 0.8s linear infinite;
+  }
+  .submit.loading .spinner { display: inline-block; }
+
+  /* shake — applied to the card; keyframe must keep the centering transform */
+  .shake { animation: lg-shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+
+  @keyframes lg-spin { to { transform: rotate(360deg); } }
+  @keyframes lg-shake {
+    10%, 90% { transform: translate(-50%, -50%) translateX(-1px); }
+    20%, 80% { transform: translate(-50%, -50%) translateX( 2px); }
+    30%, 50%, 70% { transform: translate(-50%, -50%) translateX(-4px); }
+    40%, 60% { transform: translate(-50%, -50%) translateX( 4px); }
+  }
+  @keyframes lg-fadein {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes lg-gate-glow { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.7; } }
+  @keyframes lg-key-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .door, .card { transition: none !important; }
+    .halo, .crest.pulsing { animation: none !important; }
+    .shake { animation: none !important; }
+  }
 </style>
 </head>
 <body>
-<h1>Sign in</h1>
-<form method="POST" autocomplete="on">
-  <input name="username" placeholder="Username" autocomplete="username" autofocus required>
-  <input name="password" type="password" placeholder="Password" autocomplete="current-password" required>
-  <div class="err">{{ERROR}}</div>
-  <button type="submit">Sign in</button>
-</form>
+<div class="stage" id="stage">
+
+  <!-- inner sanctum: revealed when the doors part -->
+  <div class="sanctum" aria-hidden="true">
+    <div class="halo"></div>
+    <div class="welcome">Welcome</div>
+  </div>
+
+  <!-- left door -->
+  <div class="door door-l" aria-hidden="true">
+    <svg class="ornaments" viewBox="0 0 200 600" preserveAspectRatio="none" width="100%" height="100%">
+      <defs>
+        <pattern id="gate-grid-l" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#b8935a" stroke-width="0.5" stroke-opacity="0.4"/>
+        </pattern>
+      </defs>
+      <rect width="200" height="600" fill="url(#gate-grid-l)"/>
+      <line x1="199" y1="0" x2="199" y2="600" stroke="#b8935a" stroke-opacity="0.5" stroke-width="1"/>
+      <g transform="translate(60 120)"><circle r="22" fill="none" stroke="#b8935a" stroke-width="1" stroke-opacity="0.6"/><circle r="14" fill="none" stroke="#b8935a" stroke-width="0.5" stroke-opacity="0.5"/><circle r="2" fill="#b8935a" fill-opacity="0.4"/></g>
+      <g transform="translate(60 300)"><circle r="22" fill="none" stroke="#b8935a" stroke-width="1" stroke-opacity="0.6"/><circle r="14" fill="none" stroke="#b8935a" stroke-width="0.5" stroke-opacity="0.5"/><circle r="2" fill="#b8935a" fill-opacity="0.4"/></g>
+      <g transform="translate(60 480)"><circle r="22" fill="none" stroke="#b8935a" stroke-width="1" stroke-opacity="0.6"/><circle r="14" fill="none" stroke="#b8935a" stroke-width="0.5" stroke-opacity="0.5"/><circle r="2" fill="#b8935a" fill-opacity="0.4"/></g>
+    </svg>
+    <div class="handle"></div>
+  </div>
+
+  <!-- right door -->
+  <div class="door door-r" aria-hidden="true">
+    <svg class="ornaments" viewBox="0 0 200 600" preserveAspectRatio="none" width="100%" height="100%">
+      <defs>
+        <pattern id="gate-grid-r" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#b8935a" stroke-width="0.5" stroke-opacity="0.4"/>
+        </pattern>
+      </defs>
+      <rect width="200" height="600" fill="url(#gate-grid-r)"/>
+      <line x1="1" y1="0" x2="1" y2="600" stroke="#b8935a" stroke-opacity="0.5" stroke-width="1"/>
+      <g transform="translate(140 120)"><circle r="22" fill="none" stroke="#b8935a" stroke-width="1" stroke-opacity="0.6"/><circle r="14" fill="none" stroke="#b8935a" stroke-width="0.5" stroke-opacity="0.5"/><circle r="2" fill="#b8935a" fill-opacity="0.4"/></g>
+      <g transform="translate(140 300)"><circle r="22" fill="none" stroke="#b8935a" stroke-width="1" stroke-opacity="0.6"/><circle r="14" fill="none" stroke="#b8935a" stroke-width="0.5" stroke-opacity="0.5"/><circle r="2" fill="#b8935a" fill-opacity="0.4"/></g>
+      <g transform="translate(140 480)"><circle r="22" fill="none" stroke="#b8935a" stroke-width="1" stroke-opacity="0.6"/><circle r="14" fill="none" stroke="#b8935a" stroke-width="0.5" stroke-opacity="0.5"/><circle r="2" fill="#b8935a" fill-opacity="0.4"/></g>
+    </svg>
+    <div class="handle"></div>
+  </div>
+
+  <!-- form card sits over the seam -->
+  <form class="card" id="gate-form" method="POST" autocomplete="on" novalidate>
+    <div class="header">
+      <svg class="crest" viewBox="0 0 36 36" aria-hidden="true">
+        <circle cx="18" cy="14" r="6" fill="none" stroke="#b8935a" stroke-width="1.5"/>
+        <path d="M16 19 L15 28 L21 28 L20 19" fill="#b8935a" fill-opacity="0.15" stroke="#b8935a" stroke-width="1.5" stroke-linejoin="round"/>
+        <circle cx="18" cy="14" r="2" fill="#b8935a"/>
+      </svg>
+      <h1>Login</h1>
+      <span class="eyebrow">— IP GATE —</span>
+    </div>
+
+    <div class="fields">
+      <label class="field" id="field-user">
+        <span class="label">Username</span>
+        <input name="username" type="text" autocomplete="username" autofocus required>
+        <div class="field-err" id="err-user"></div>
+      </label>
+
+      <label class="field" id="field-pw">
+        <span class="label">Password</span>
+        <div class="pw-wrap">
+          <input name="password" type="password" autocomplete="current-password" required>
+          <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Show password">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+              <line class="slash" x1="3" y1="3" x2="21" y2="21"/>
+            </svg>
+          </button>
+        </div>
+        <div class="field-err" id="err-pw"></div>
+      </label>
+    </div>
+
+    <input type="hidden" name="next" id="next" value="{{NEXT}}">
+    <div class="form-err" id="form-err" role="alert" aria-live="polite">{{ERROR}}</div>
+
+    <button type="submit" class="submit" id="submit">
+      <span class="submit-label">Enter</span>
+      <span class="spinner" aria-hidden="true"></span>
+    </button>
+  </form>
+</div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const form = document.getElementById('gate-form');
+  const submit = document.getElementById('submit');
+  const submitLabel = submit.querySelector('.submit-label');
+  const formErr = document.getElementById('form-err');
+  const userInput = form.elements.username;
+  const pwInput = form.elements.password;
+  const pwToggle = document.getElementById('pw-toggle');
+  const userField = document.getElementById('field-user');
+  const pwField = document.getElementById('field-pw');
+  const userErr = document.getElementById('err-user');
+  const pwErr = document.getElementById('err-pw');
+  const crest = form.querySelector('.crest');
+  const nextInput = form.elements.next;
+
+  // Mirror of the server-side check. Defense-in-depth: even if the hidden
+  // input is somehow populated with a hostile value, we won't navigate to it.
+  const isSafeNext = (s) =>
+    typeof s === 'string'
+    && s.length > 0 && s.length <= 1024
+    && s.startsWith('/')
+    && !s.startsWith('//')
+    && !s.includes('\\');
+
+  // ----- show/hide password -----
+  pwToggle.addEventListener('click', () => {
+    const showing = pwInput.type === 'text';
+    pwInput.type = showing ? 'password' : 'text';
+    pwToggle.classList.toggle('shown', !showing);
+    pwToggle.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+  });
+
+  // ----- field validation -----
+  const setFieldError = (field, errEl, msg) => {
+    field.classList.add('errored');
+    errEl.textContent = msg;
+  };
+  const clearFieldError = (field, errEl) => {
+    field.classList.remove('errored');
+    errEl.textContent = '';
+  };
+  const validateField = (input, field, errEl, msg) => {
+    if (!input.value.trim()) setFieldError(field, errEl, msg);
+    else clearFieldError(field, errEl);
+  };
+  userInput.addEventListener('blur', () => {
+    if (userInput.dataset.touched) validateField(userInput, userField, userErr, 'Username is required');
+  });
+  pwInput.addEventListener('blur', () => {
+    if (pwInput.dataset.touched) validateField(pwInput, pwField, pwErr, 'Password is required');
+  });
+  userInput.addEventListener('input', () => {
+    userInput.dataset.touched = '1';
+    if (userInput.value.trim()) clearFieldError(userField, userErr);
+  });
+  pwInput.addEventListener('input', () => {
+    pwInput.dataset.touched = '1';
+    if (pwInput.value) clearFieldError(pwField, pwErr);
+  });
+
+  // ----- shake (force reflow so re-applying the class re-triggers the keyframe) -----
+  const shake = () => {
+    form.classList.remove('shake');
+    void form.offsetWidth;
+    form.classList.add('shake');
+  };
+
+  // ----- state helpers -----
+  const setLoading = (on) => {
+    submit.classList.toggle('loading', on);
+    submit.disabled = on;
+    crest.classList.toggle('pulsing', on);
+    submitLabel.textContent = on ? 'Unlocking' : 'Enter';
+  };
+  const setFormError = (msg) => { formErr.textContent = msg; };
+
+  // ----- submit intercept -----
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    userInput.dataset.touched = '1';
+    pwInput.dataset.touched = '1';
+
+    const userOk = !!userInput.value.trim();
+    const pwOk = !!pwInput.value;
+    if (!userOk) setFieldError(userField, userErr, 'Username is required');
+    if (!pwOk) setFieldError(pwField, pwErr, 'Password is required');
+    if (!userOk || !pwOk) { shake(); return; }
+
+    setFormError('');
+    setLoading(true);
+
+    let resp;
+    try {
+      // FormData picks up every named form field including the hidden
+      // `next` input — so the server sees `next` in the body, not just
+      // in the URL query string. URL params can be stripped by some
+      // Nginx / CDN / WAF configurations on POST; bodies are not.
+      resp = await fetch(window.location.href, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(new FormData(form)),
+        redirect: 'manual',
+        credentials: 'same-origin',
+      });
+    } catch {
+      setLoading(false);
+      setFormError('Network error. Try again.');
+      shake();
+      return;
+    }
+
+    // Two success shapes:
+    //  - 302 with redirect: 'manual' returns an opaque response (status 0 /
+    //    type 'opaqueredirect'). Means the server is sending us to `next`.
+    //  - 200 means the server has no return URL for us; just play the
+    //    animation and stay on the page.
+    const isRedirect = resp.type === 'opaqueredirect' || resp.status === 0 || (resp.status >= 300 && resp.status < 400);
+    const isOk200 = resp.status === 200;
+    if (isRedirect || isOk200) {
+      stage.classList.add('opened');
+      const next = nextInput && nextInput.value;
+      if (isSafeNext(next)) {
+        setTimeout(() => { window.location.assign(next); }, 850);
+      }
+      // No safe next → leave the user on the open-doors / welcome screen.
+      return;
+    }
+
+    setLoading(false);
+    if (resp.status === 401) {
+      setFormError('Incorrect username or password.');
+    } else {
+      setFormError('Unexpected error. Try again.');
+    }
+    shake();
+  });
+})();
+</script>
 </body>
 </html>
