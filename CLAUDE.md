@@ -8,15 +8,15 @@ A tiny Node.js auth backend for Nginx's [`auth_request`](https://nginx.org/en/do
 
 ## Commands
 
-- Install: `npm install`
+- Install: `npm ci`
 - Run (production): `node index.js` (loads `.env`)
-- Run (local browser testing): `npm run dev` — overrides `TRUST_REMOTE_ADDR=yes` for that process so the form works via `http://localhost:3000` without an Nginx in front. Don't use in production.
+- Run (local browser testing): `npm run dev` — overrides `TRUST_REMOTE_ADDR=yes` for that process so the form works via `http://localhost:8350` without an Nginx in front. Don't use in production.
 - Hash a password: `npm run hashpw -- <password>` (paste output as the value in `users.json`)
 - Unit tests: `npm test` (Jest with `NODE_OPTIONS=--experimental-vm-modules` because the project is ESM)
 - Single test file: `npm test -- tests/handlers/gate.test.js`
 - Single test by name: `npm test -- -t "POST with valid creds"`
 - End-to-end smoke: `npm run smoke` — spins up the server with a temp `users.json`, hits every endpoint over real HTTP, asserts status codes, tears down. Override port with `SMOKE_PORT=… npm run smoke`.
-- Docker: `docker compose up --build` (publishes port 3000 to localhost only; native Nginx on the host reaches the gate at `http://127.0.0.1:3000`).
+- Docker: `docker compose up --build` (publishes port 8350 to localhost only; native Nginx on the host reaches the gate at `http://127.0.0.1:8350`).
 
 ## Architecture
 
@@ -45,7 +45,7 @@ When both are set, an entry expires at whichever fires first. Either can be unse
 
 **`X-Forwarded-For` is required** by `/verify`, `/deauth`, `POST /gate`, and `/heartbeat`. Nginx must set it (`proxy_set_header X-Forwarded-For $remote_addr;` — see `examples/nginx-*.conf`). Without it the handlers return 401/400. Don't silently fall back to `req.socket.remoteAddress` — behind Nginx that's the proxy, not the real client, and would effectively allowlist everyone.
 
-**Dev-only escape hatch**: `TRUST_REMOTE_ADDR=yes` (config flag, off by default) lets the credentialed handlers fall back to `req.socket.remoteAddress` when XFF is missing. Designed for local `npm start` testing in a browser at `http://localhost:3000` without an Nginx in front. XFF still wins when both are present, so a misconfigured prod box with the flag accidentally on still does the right thing — but production should leave it off.
+**Dev-only escape hatch**: `TRUST_REMOTE_ADDR=yes` (config flag, off by default) lets the credentialed handlers fall back to `req.socket.remoteAddress` when XFF is missing. Designed for local `npm start` testing in a browser at `http://localhost:8350` without an Nginx in front. XFF still wins when both are present, so a misconfigured prod box with the flag accidentally on still does the right thing — but production should leave it off.
 
 **Users live in `users.json`** as a flat `{username: bcryptHash}` map (no nested objects). Hashes generated via `npm run hashpw -- <password>`. Bcrypt comparison is in `lib/auth.js`. The file is gitignored — there's no committed template; create it from scratch on a fresh deploy.
 
