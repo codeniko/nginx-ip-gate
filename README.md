@@ -1,8 +1,8 @@
 # nginx-ip-gate
 
-Tiny Node.js auth backend for the Nginx [`auth_request`](https://nginx.org/en/docs/http/ngx_http_auth_request_module.html) module inspired by [`zuavra/nginx-ip-whitelister`](https://github.com/zuavra/nginx-ip-whitelister).
+Tiny self-hosted Nginx auth backend that allowlists your public IP after a login — so smart TVs and casting devices on your home network just work. Log in once from your phone via a small form; every device behind the same NAT inherits access until the session expires.
 
-A user POSTs username + password to `/gate` from any device on the LAN; the server allowlists their public IP for a configurable window. Every device behind the same NAT (TVs, casting devices) inherits access until the window expires.
+Built around Nginx's [`auth_request`](https://nginx.org/en/docs/http/ngx_http_auth_request_module.html) module; inspired by [`zuavra/nginx-ip-whitelister`](https://github.com/zuavra/nginx-ip-whitelister).
 
 > **Be mindful using this from public WiFi, hotels, cafés, cellular networks, or work — it allows every device on that network to access your apps. Only run behind HTTPS.
 
