@@ -6,8 +6,10 @@ export const createVerifyHandler = ({ allowlist, logger, trustRemoteAddr = false
     }
 
     const ip = req.headers['x-forwarded-for'] || (trustRemoteAddr ? req.socket?.remoteAddress : null);
+    const originalUri = req.headers['x-original-uri'];
+    const target = originalUri ? ` -> ${originalUri}` : '';
     if (!ip) {
-        logger.log('verify: missing X-Forwarded-For');
+        logger.log(`verify: missing X-Forwarded-For${target}`);
         res.statusCode = 401;
         return res.end('UNAUTHORIZED');
     }
@@ -17,7 +19,7 @@ export const createVerifyHandler = ({ allowlist, logger, trustRemoteAddr = false
         return res.end('OK');
     }
 
-    logger.log(`verify: rejected ${ip}`);
+    logger.log(`verify: rejected ${ip}${target}`);
     res.statusCode = 401;
     return res.end('UNAUTHORIZED');
 };
