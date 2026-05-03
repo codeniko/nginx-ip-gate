@@ -14,18 +14,18 @@ Built around Nginx's [`auth_request`](https://nginx.org/en/docs/http/ngx_http_au
 ```
                  not allowlisted              allowlisted
                   ┌───────────────┐            ┌───────────────┐
-   Browser ──┬──> │ Nginx         │ ─302 /gate │ Nginx         │ ──> upstream app
+   Browser ──┬──> │ Nginx         │            │ Nginx         │ ──> upstream app
              │    │ + auth_request│            │ + auth_request│
              │    │   ↓           │            │   ↓ /verify   │
              │    │   /verify 401 │            │   200 OK      │
-             │    └───────────────┘            └───────────────┘
-             │            │
+             │    └───────┬───────┘            └───────────────┘
              │            │ 302 to /gate?next=<original-url>
              │            ↓
              │     ┌───────────────┐    POST /gate    ┌───────────────┐
              └─────│ /gate (form)  │ ───────────────> │ allowlist.add │
                    └───────────────┘                  │ → 302 to next │
                                                       └───────────────┘
+        (after login, the browser retries <original-url> and hits the allowlisted path)
 ```
 
 For each request to a protected app, Nginx fires a subrequest to `/verify`. If the requester's IP is in the in-memory allowlist, the subrequest returns 200 and the original request proceeds to the upstream. If not, Nginx 302s the user to `/gate?next=<original-url>`, which serves a login form. POSTing valid creds adds the IP to the allowlist and 302s back to `next`.
