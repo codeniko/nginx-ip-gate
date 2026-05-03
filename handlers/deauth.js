@@ -1,6 +1,6 @@
 const PAGE = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Signed out</title>
-<style>body{font-family:system-ui,sans-serif;max-width:22rem;margin:4rem auto;padding:0 1rem}</style>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Signed out</title>
+<style>body{font-family:system-ui,sans-serif;font-size:1.1rem;line-height:1.5;max-width:30rem;margin:4rem auto;padding:0 1.25rem}</style>
 </head><body><p>Signed out. This IP has been removed from the allowlist.</p></body></html>
 `;
 
