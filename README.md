@@ -6,6 +6,9 @@ A user POSTs username + password to `/gate` from any device on the LAN; the serv
 
 > **Be mindful using this from public WiFi, hotels, cafés, cellular networks, or work — it allows every device on that network to access your apps. Only run behind HTTPS.
 
+<video src="https://github.com/user-attachments/assets/846e660f-05e4-4a3d-afc6-b144e6a969f1" width="300" autoplay loop muted playsinline></video>
+
+
 ## How it works
 
 ```
