@@ -16,7 +16,7 @@ A tiny Node.js auth backend for Nginx's [`auth_request`](https://nginx.org/en/do
 - Single test file: `npm test -- tests/handlers/gate.test.js`
 - Single test by name: `npm test -- -t "POST with valid creds"`
 - End-to-end smoke: `npm run smoke` — spins up the server with a temp `users.json`, hits every endpoint over real HTTP, asserts status codes, tears down. Override port with `SMOKE_PORT=… npm run smoke`.
-- Docker: `docker compose up --build` (publishes port 8350 to localhost only; native Nginx on the host reaches the gate at `http://127.0.0.1:8350`).
+- Docker: `docker compose up -d` pulls the CI-built image from GHCR (`ghcr.io/codeniko/nginx-ip-gate:latest`); port 8350 is published to localhost only. To build locally instead, see comments in `docker-compose.yaml`.
 
 ## Architecture
 
@@ -26,11 +26,14 @@ The server is plain `node:http` — no framework. `index.js` wires factories and
 
 - `GET /gate` — serve `views/gate.html`. The form has no `action`, so POSTs back to whatever URL it was served from.
 - `POST /gate` — parse `application/x-www-form-urlencoded`, verify creds, allowlist `X-Forwarded-For`. Two response shapes depending on the `next` form field: with a safe relative `next`, returns `302 Location: <next>`; without, returns `200 OK` with a tiny "Authenticated" body and no redirect (lets the JS path play the gate-open animation and stay on the welcome screen).
-- `next` plumbing: GET `/gate` reads `?next=…` from the URL, validates via `isSafeNext` (must start with `/`, not `//`, no backslash, ≤1024 chars), and embeds it as a hidden form field. POST re-validates from the body. Unsafe values collapse to empty — same UX as no-next. Server-side validation runs at both points; the JS in `views/gate.html` mirrors the same check as defense-in-depth before calling `window.location.assign`. Nginx examples use `error_page 401 = @to_gate; @to_gate { return 302 /gate?next=$request_uri; }`. Known imperfection: `$request_uri` isn't URL-encoded by Nginx, so multi-`&` query strings on the original URL get truncated when round-tripped through `next` — single-`?` URLs roundtrip fine.
 - `GET /heartbeat` — machine-friendly equivalent of `POST /gate`. HTTP Basic Auth instead of a form body, no redirect, response body is `good <ip>` or `nochg <ip>` (DynDNS protocol convention) so off-the-shelf router DDNS clients render a healthy status. Designed for routers, cron jobs, and home-automation pings.
 - `GET /verify` — `auth_request` target. 200 if the IP is allowlisted (refreshes `lastModifiedAt`), 401 otherwise.
 - `GET /deauth` — idempotent removal of the requester's IP from the allowlist. No auth.
 - `GET /health` — liveness probe for the Docker HEALTHCHECK. Always 200, no auth, no logging, untouched by the allowlist. Inline in `index.js` (no separate handler module) because it's three lines and dependency-free.
+
+**`next` plumbing** — GET `/gate` reads `?next=…` from the URL, validates via `isSafeNext` (must start with `/`, not `//`, no backslash, ≤1024 chars), and embeds it as a hidden form field. The form's POST body carries `next` (not the URL — this survives Nginx/CDN/WAF configs that strip query strings on POST). POST re-validates. Unsafe values collapse to empty — same UX as no-next. The JS in `views/gate.html` mirrors the same check before calling `window.location.assign`. Nginx examples use `error_page 401 = @to_gate; @to_gate { return 302 /gate?next=$request_uri; }`. Known imperfection: `$request_uri` isn't URL-encoded by Nginx, so multi-`&` query strings on the original URL get truncated when round-tripped through `next` — single-`?` URLs roundtrip fine.
+
+**Login UI** (`views/gate.html`) — single self-contained HTML file with inline CSS and vanilla JS, no build step or framework. Visual design is a "gate doors" metaphor; doors slide apart on successful auth (CSS transition, 850ms). The JS uses `redirect: 'manual'` on its POST so the page survives the 302 long enough to play the animation, then navigates to `next` (or stays on the welcome screen if no `next`). `prefers-reduced-motion` skips the animation. Keep the design intact when refactoring — it's intentional, not legacy.
 
 **Single shared allowlist** (`lib/allowlist.js`) — `Map<ip, { createdAt, lastModifiedAt, user }>`. One login covers every gated app behind this Nginx; there is intentionally no per-app namespacing. Per-IP eviction is lazy (only on the next `/verify` for that IP), so a periodic `sweep()` runs on `setInterval` from `index.js` to prune entries whose IPs never come back — important for dynamic-IP ISPs where each lease rotation is effectively a new key. Cadence is `SWEEP_INTERVAL` (default `24h`); the interval is `.unref()`'d so it doesn't block shutdown.
 
@@ -45,12 +48,14 @@ When both are set, an entry expires at whichever fires first. Either can be unse
 
 **`X-Forwarded-For` is required** by `/verify`, `/deauth`, `POST /gate`, and `/heartbeat`. Nginx must set it (`proxy_set_header X-Forwarded-For $remote_addr;` — see `examples/nginx-*.conf`). Without it the handlers return 401/400. Don't silently fall back to `req.socket.remoteAddress` — behind Nginx that's the proxy, not the real client, and would effectively allowlist everyone.
 
-**Dev-only escape hatch**: `TRUST_REMOTE_ADDR=yes` (config flag, off by default) lets the credentialed handlers fall back to `req.socket.remoteAddress` when XFF is missing. Designed for local `npm start` testing in a browser at `http://localhost:8350` without an Nginx in front. XFF still wins when both are present, so a misconfigured prod box with the flag accidentally on still does the right thing — but production should leave it off.
+**Dev-only escape hatch**: `TRUST_REMOTE_ADDR=yes` (config flag, off by default) lets the credentialed handlers fall back to `req.socket.remoteAddress` when XFF is missing. Designed for local `npm run dev` testing in a browser at `http://localhost:8350` without an Nginx in front. XFF still wins when both are present, so a misconfigured prod box with the flag accidentally on still does the right thing — but production should leave it off.
 
 **Users live in `users.json`** as a flat `{username: bcryptHash}` map (no nested objects). Hashes generated via `npm run hashpw -- <password>`. Bcrypt comparison is in `lib/auth.js`. The file is gitignored — there's no committed template; create it from scratch on a fresh deploy.
 
 **Config via `.env`**, committed with sensible defaults — there are no secrets in env. Only `users.json` carries secrets and stays gitignored. If you ever add a secret-bearing env var (e.g. session secret), revisit `.gitignore` and reintroduce a `.env.example` template.
 
+**CI / publishing** (`.github/workflows/ci.yml`) — runs `npm test` and `npm run smoke` on every push and PR. On pushes to `main`, after tests pass, builds and publishes the Docker image to `ghcr.io/codeniko/nginx-ip-gate` with `:latest` and `:sha-<short>` tags. The shipped `docker-compose.yaml` pulls `:latest` by default with `pull_policy: always`, so production servers track main automatically when their compose stack restarts.
+
 ## Test setup gotcha
 
-ESM + Jest requires `NODE_OPTIONS=--experimental-vm-modules` (set in the `test` script). Use `import { jest } from '@jest/globals'`. When mocking a POST body in handler tests, send `Buffer` chunks via `Readable.from([Buffer.from(body, 'utf8')])` — real `http.IncomingMessage` yields `Buffer` chunks and `Buffer.concat` rejects strings. See `tests/handlers/gate.test.js:23` for the canonical fixture.
+ESM + Jest requires `NODE_OPTIONS=--experimental-vm-modules` (set in the `test` script). Use `import { jest } from '@jest/globals'`. When mocking a POST body in handler tests, send `Buffer` chunks via `Readable.from([Buffer.from(body, 'utf8')])` — real `http.IncomingMessage` yields `Buffer` chunks and `Buffer.concat` rejects strings. See the `reqWith` helper in `tests/handlers/gate.test.js` for the canonical fixture.

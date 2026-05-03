@@ -152,15 +152,17 @@ npm run smoke       # end-to-end: spins up the server with a temp users file, hi
 
 ## Docker
 
-The shipped `docker-compose.yaml` runs the gate as a container that publishes port 8350 to **localhost only** (not exposed on your LAN). Your Nginx (running on the host) reaches it at `http://127.0.0.1:8350`.
+The shipped `docker-compose.yaml` pulls the CI-built image from GitHub Container Registry and runs it as a container that publishes port 8350 to **localhost only** (not exposed on your LAN). Your Nginx (running on the host) reaches it at `http://127.0.0.1:8350`.
 
 ```sh
 # Create users.json (see Setup above), then:
-docker compose up -d --build
+docker compose up -d
 
 # Verify the container is up and healthy
 docker compose ps
 ```
+
+To build locally from the Dockerfile instead of pulling, see the comments in `docker-compose.yaml`.
 
 In your Nginx config, the `proxy_pass` lines all point at `http://127.0.0.1:8350/...`.
 

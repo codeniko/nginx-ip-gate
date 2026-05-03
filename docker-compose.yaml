@@ -1,7 +1,11 @@
 services:
   nginx-ip-gate:
     container_name: nginx-ip-gate
-    build: .
+    # Pull the CI-built image from GHCR (default). To build locally instead,
+    # comment this `image` line and uncomment the `build` line below.
+    image: ghcr.io/codeniko/nginx-ip-gate:latest
+    pull_policy: always
+    # build: .
     restart: unless-stopped
     environment:
       PORT: 8350
