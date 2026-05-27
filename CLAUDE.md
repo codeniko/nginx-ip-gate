@@ -56,6 +56,25 @@ When both are set, an entry expires at whichever fires first. Either can be unse
 
 **CI / publishing** (`.github/workflows/ci.yml`) — runs `npm test` and `npm run smoke` on every push and PR. On pushes to `main`, after tests pass, builds and publishes the Docker image to `ghcr.io/codeniko/nginx-ip-gate` with `:latest` and `:sha-<short>` tags. The shipped `docker-compose.yaml` pulls `:latest` by default with `pull_policy: always`, so production servers track main automatically when their compose stack restarts.
 
+## Example Nginx configs (read before suggesting Nginx changes)
+
+Three files in `examples/`. Both deployment styles use the same names and shapes — when answering Nginx questions, **reuse these names instead of inventing fresh ones**.
+
+- `examples/nginx-host-based.conf` — drop-in snippet for the per-host model (each gated app on its own (sub)domain). Defines the four shared locations as a reusable block to paste into each `server {}`.
+- `examples/nginx-path-based.conf` — full `server {}` for the per-path model (one server block, multiple apps under prefixes like `/app1/`, `/app2/`). Declares the shared locations once; each app's `location` references them.
+- `examples/nginx-http-ip-gate.conf` — optional `http {}`-level snippet declaring the `gate_login` rate-limit zone (10m memory, 10r/m per IP). Required only if you uncomment the `limit_req zone=gate_login …` lines in the other two files; otherwise `nginx -t` fails with "zero size shared memory zone gate_login".
+
+**Shared conventions across both example configs:**
+
+- `location = /__auth` — internal subrequest target. `internal;`, `proxy_pass http://127.0.0.1:8350/verify;`, `proxy_pass_request_body off;`, `proxy_set_header Content-Length "";`, `proxy_set_header X-Forwarded-For $remote_addr;`, `proxy_set_header X-Original-URI $request_uri;`. Hit on every protected request — **do not rate-limit it**.
+- `location = /gate` — public, proxies to ip-gate's `/gate`. Sets `X-Forwarded-For $remote_addr` and `Host $host`. Rate-limit candidate (bcrypt cost).
+- `location = /heartbeat` — public, proxies to ip-gate's `/heartbeat`. Sets `X-Forwarded-For $remote_addr`. Rate-limit candidate (bcrypt cost). Routers polling every 5–10 min sit well under the 10r/m default.
+- `location = /deauth` — public, proxies to ip-gate's `/deauth`. Sets `X-Forwarded-For $remote_addr`. No bcrypt, no rate limit.
+- `location @to_gate` — named 401 fallback. `return 302 /gate?next=$request_uri;`.
+- Per-app gating is `auth_request /__auth; error_page 401 = @to_gate;` inside the app's `location`.
+
+**Known interaction gotcha — `auth_basic` + `auth_request` on the same location:** `error_page 401 = @to_gate;` catches **every** 401 in that location, including 401s from `auth_basic` (before the subrequest even runs) and from the upstream app. Stacked with `auth_basic`, the basic-auth `WWW-Authenticate` challenge gets swallowed by the redirect and the browser never prompts. To keep both, branch the 401 on `auth_request_set $ipgate_status $upstream_status;` — empty string means the subrequest never ran, so the 401 came from somewhere else (`auth_basic` or upstream) and you should let it through with its original headers rather than redirecting.
+
 ## Test setup gotcha
 
 ESM + Jest requires `NODE_OPTIONS=--experimental-vm-modules` (set in the `test` script). Use `import { jest } from '@jest/globals'`. When mocking a POST body in handler tests, send `Buffer` chunks via `Readable.from([Buffer.from(body, 'utf8')])` — real `http.IncomingMessage` yields `Buffer` chunks and `Buffer.concat` rejects strings. See the `reqWith` helper in `tests/handlers/gate.test.js` for the canonical fixture.
